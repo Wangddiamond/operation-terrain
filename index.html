@@ -765,6 +765,29 @@
     <script>
         // Animation et interactions au chargement
         document.addEventListener('DOMContentLoaded', function() {
+            const STORAGE_KEY = 'fluxia_gantt_tasks_v1';
+
+            function loadSavedTasks() {
+                try {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    if (!raw) return {};
+                    return JSON.parse(raw);
+                } catch (e) {
+                    console.error('Erreur chargement tâches sauvegardées', e);
+                    return {};
+                }
+            }
+
+            function saveTasks(data) {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                } catch (e) {
+                    console.error('Erreur sauvegarde tâches', e);
+                }
+            }
+
+            const savedTasks = loadSavedTasks();
+
             // Animation des barres du Gantt
             const bars = document.querySelectorAll('.timeline-bar');
             bars.forEach((bar, index) => {
@@ -781,16 +804,6 @@
                 }, index * 30);
             });
 
-            // Rendre les responsables éditables
-            const responsables = document.querySelectorAll('.task-row .responsable');
-            responsables.forEach(cell => {
-                cell.contentEditable = 'true';
-                cell.classList.add('responsable-editable');
-                if (!cell.textContent.trim()) {
-                    cell.setAttribute('data-placeholder', 'Cliquer pour ajouter un responsable');
-                }
-            });
-
             // Gestion du changement de statut (clic pour faire défiler les états)
             const STATUS_STATES = [
                 { className: 'status-todo', label: 'À FAIRE' },
@@ -798,32 +811,86 @@
                 { className: 'status-done', label: 'TERMINÉ' }
             ];
 
-            const statusSpans = document.querySelectorAll('.task-row .status');
-            statusSpans.forEach(span => {
-                span.title = 'Cliquer pour changer le statut';
+            // Initialisation des lignes de tâches avec IDs, responsables éditables et statuts persistants
+            const taskRows = document.querySelectorAll('.task-row');
 
-                span.addEventListener('click', () => {
-                    let currentIndex = STATUS_STATES.findIndex(state =>
-                        span.classList.contains(state.className)
-                    );
+            taskRows.forEach((row, index) => {
+                const taskId = String(index);
+                row.dataset.taskId = taskId;
 
-                    if (currentIndex === -1) {
-                        currentIndex = 0;
-                        span.classList.add(STATUS_STATES[0].className);
-                        span.textContent = STATUS_STATES[0].label;
-                        return;
+                const responsableCell = row.querySelector('.responsable');
+                const statusSpan = row.querySelector('.status');
+
+                // Charger valeurs sauvegardées si elles existent
+                const saved = savedTasks[taskId] || {};
+
+                // RESPONSABLE éditable + persistance
+                if (responsableCell) {
+                    if (typeof saved.responsable === 'string') {
+                        responsableCell.textContent = saved.responsable;
                     }
 
-                    const nextIndex = (currentIndex + 1) % STATUS_STATES.length;
+                    responsableCell.contentEditable = 'true';
+                    responsableCell.classList.add('responsable-editable');
+                    if (!responsableCell.textContent.trim()) {
+                        responsableCell.setAttribute('data-placeholder', 'Cliquer pour ajouter un responsable');
+                    }
 
-                    STATUS_STATES.forEach(state => {
-                        span.classList.remove(state.className);
+                    const saveResponsable = () => {
+                        const allData = loadSavedTasks();
+                        allData[taskId] = allData[taskId] || {};
+                        allData[taskId].responsable = responsableCell.textContent.trim();
+                        saveTasks(allData);
+                    };
+
+                    responsableCell.addEventListener('blur', saveResponsable);
+                    responsableCell.addEventListener('keyup', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            responsableCell.blur();
+                        }
                     });
+                }
 
-                    const nextState = STATUS_STATES[nextIndex];
-                    span.classList.add(nextState.className);
-                    span.textContent = nextState.label;
-                });
+                // STATUT cliquable + persistance
+                if (statusSpan) {
+                    statusSpan.title = 'Cliquer pour changer le statut';
+
+                    // Appliquer statut sauvegardé
+                    if (saved.statusClass && saved.statusLabel) {
+                        STATUS_STATES.forEach(state => {
+                            statusSpan.classList.remove(state.className);
+                        });
+                        statusSpan.classList.add(saved.statusClass);
+                        statusSpan.textContent = saved.statusLabel;
+                    }
+
+                    statusSpan.addEventListener('click', () => {
+                        let currentIndex = STATUS_STATES.findIndex(state =>
+                            statusSpan.classList.contains(state.className)
+                        );
+
+                        if (currentIndex === -1) {
+                            currentIndex = 0;
+                        }
+
+                        const nextIndex = (currentIndex + 1) % STATUS_STATES.length;
+
+                        STATUS_STATES.forEach(state => {
+                            statusSpan.classList.remove(state.className);
+                        });
+
+                        const nextState = STATUS_STATES[nextIndex];
+                        statusSpan.classList.add(nextState.className);
+                        statusSpan.textContent = nextState.label;
+
+                        const allData = loadSavedTasks();
+                        allData[taskId] = allData[taskId] || {};
+                        allData[taskId].statusClass = nextState.className;
+                        allData[taskId].statusLabel = nextState.label;
+                        saveTasks(allData);
+                    });
+                }
             });
         });
     </script>
