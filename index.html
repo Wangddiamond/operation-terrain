@@ -128,6 +128,15 @@
             font-weight: bold;
         }
         
+        .responsable-editable {
+            border-bottom: 1px dashed #ffa500;
+            cursor: text;
+        }
+        
+        .responsable-editable:focus {
+            outline: 1px solid #ffa500;
+        }
+        
         .timeline-cell {
             position: relative;
             min-width: 400px;
@@ -192,6 +201,7 @@
             font-size: 11px;
             font-weight: bold;
             display: inline-block;
+            cursor: pointer;
         }
         
         .status-todo {
@@ -753,8 +763,9 @@
     </div>
     
     <script>
-        // Animation au chargement
+        // Animation et interactions au chargement
         document.addEventListener('DOMContentLoaded', function() {
+            // Animation des barres du Gantt
             const bars = document.querySelectorAll('.timeline-bar');
             bars.forEach((bar, index) => {
                 setTimeout(() => {
@@ -768,6 +779,51 @@
                         bar.style.transform = 'scaleX(1)';
                     }, 50);
                 }, index * 30);
+            });
+
+            // Rendre les responsables éditables
+            const responsables = document.querySelectorAll('.task-row .responsable');
+            responsables.forEach(cell => {
+                cell.contentEditable = 'true';
+                cell.classList.add('responsable-editable');
+                if (!cell.textContent.trim()) {
+                    cell.setAttribute('data-placeholder', 'Cliquer pour ajouter un responsable');
+                }
+            });
+
+            // Gestion du changement de statut (clic pour faire défiler les états)
+            const STATUS_STATES = [
+                { className: 'status-todo', label: 'À FAIRE' },
+                { className: 'status-inprogress', label: 'EN COURS' },
+                { className: 'status-done', label: 'TERMINÉ' }
+            ];
+
+            const statusSpans = document.querySelectorAll('.task-row .status');
+            statusSpans.forEach(span => {
+                span.title = 'Cliquer pour changer le statut';
+
+                span.addEventListener('click', () => {
+                    let currentIndex = STATUS_STATES.findIndex(state =>
+                        span.classList.contains(state.className)
+                    );
+
+                    if (currentIndex === -1) {
+                        currentIndex = 0;
+                        span.classList.add(STATUS_STATES[0].className);
+                        span.textContent = STATUS_STATES[0].label;
+                        return;
+                    }
+
+                    const nextIndex = (currentIndex + 1) % STATUS_STATES.length;
+
+                    STATUS_STATES.forEach(state => {
+                        span.classList.remove(state.className);
+                    });
+
+                    const nextState = STATUS_STATES[nextIndex];
+                    span.classList.add(nextState.className);
+                    span.textContent = nextState.label;
+                });
             });
         });
     </script>
